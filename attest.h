@@ -1,6 +1,11 @@
 #ifndef ATTEST_H
 #define ATEST_H
 
+#ifdef __cplusplus
+#include <iostream>
+#include <sstream>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,7 +14,8 @@
     extern "C" {
 #endif
 
-/*  Attest - a minimal unit testing framework for C and C++
+/*  
+    Attest - a minimal unit testing framework for C and C++
 */
 
 typedef void (*attest_func_t)(void);
@@ -24,9 +30,7 @@ typedef struct attest_testcase
     struct attest_testcase *next;
 } attest_testcase_t;
 
-//extern attest_testcase_t *attest_head;
-
-//macro for registering tests
+//  C assertion macros
 #define REGISTER_TEST(name) \
         static void name(void); \
         static attest_testcase_t name##_case = {#name, name, NULL}; \
@@ -36,33 +40,31 @@ typedef struct attest_testcase
         } \
         static void name(void)
 
-//basic assertion macros
-
 #define ATTEST_TRUE(condition) do \
         { \
             if (!(condition)) \
             { \
-                fprintf(stderr, "[FAIL] %s:%d: ASSERT_TRUE(%s)\n", __FILE__, __LINE__, #condition); \
+                fprintf(stderr, "[FAIL] %s:%d: ATTEST_TRUE(%s)\n", __FILE__, __LINE__, #condition); \
                 attest_current_failed = 1; \
                 return; \
             } \
         } while (0)
 
-#define ATTEST_EQ(a, b) do \
+#define ATTEST_INT_EQUAL(a, b) do \
         { \
             if (!((a) == (b))) \
             { \
-                fprintf(stderr, "[FAIL] %s:%d: ASSERT_EQ(%s, %s) - found %lld vs %lld\n", __FILE__, __LINE__, #a, #b, (long long)(a), (long long)(b)); \
+                fprintf(stderr, "[FAIL] %s:%d: ATTEST_INT_EQUAL(%s, %s) - found %lld vs %lld\n", __FILE__, __LINE__, #a, #b, (long long)(a), (long long)(b)); \
                 attest_current_failed = 1; \
                 return; \
             } \
         } while (0)
 
-#define ATTEST_STR_EQ(a, b) do \
+#define ATTEST_STRING_EQUAL(a, b) do \
         { \
             if (strcmp((a), (b)) != 0) \
             { \
-                fprintf(stderr, "[FAIL] %s:%d: ASSERT_STR_EQ(%s, %s)\n", __FILE__, __LINE__, #a, #b); \
+                fprintf(stderr, "[FAIL] %s:%d: ATTEST_STRING_EQUAL(%s, %s)\n", __FILE__, __LINE__, #a, #b); \
                 attest_current_failed = 1; \
                 return; \
             } \
@@ -72,11 +74,12 @@ typedef struct attest_testcase
         { \
             if (((a) == (b))) \
             { \
-                fprintf(stderr, "[FAIL] %s:%d: ASSERT_NOT_EQUAL(%s, %s) - found both to be equal\n", __FILE__, __LINE__, #a, #b, (long long)(a), (long long)(b)); \
+                fprintf(stderr, "[FAIL] %s:%d: ATTEST_NOT_EQUAL(%s, %s) - found both to be equal\n", __FILE__, __LINE__, #a, #b, (long long)(a), (long long)(b)); \
                 attest_current_failed = 1; \
                 return; \
             } \
         } while (0)
+
 
 void attest_register(const char* name, attest_func_t func, const char* file, int line);
 int run_all_tests(const char* filter, int quiet);
@@ -91,7 +94,7 @@ static int attest_current_failed = 0;
 
 void attest_register(const char* name, attest_func_t func, const char* file, int line)
 {
-    attest_testcase_t* t = malloc(sizeof(attest_testcase_t));
+    attest_testcase_t* t = (attest_testcase_t*)malloc(sizeof(attest_testcase_t));
     t-> name = name;
     t->func = func;
     t->file = file;
@@ -133,7 +136,6 @@ int run_all_tests(const char* filter, int quiet)
         else
         {
             //not necessary to print FAIL because the macros already do that
-            //printf("[FAIL] %s\n", t->name);
             failed++;
             attest_current_failed = 0;
         }
@@ -171,6 +173,21 @@ int main(int argc, char** argv)
 
 #ifdef __cplusplus
     }
+#endif
+
+//  C++ template based assertions
+#ifdef __cplusplus
+template <typename T>
+inline void attest_equal(const T& a, const T& b, const char* a_str, const char* b_str, const char* file, int line)
+{
+    if (!((a) == (b)))
+    {
+        fprintf(stderr, "[FAIL] %s:%d: C++ ATTEST_EQUAL(%s, %s) - found %lld vs %lld\n", __FILE__, __LINE__, a_str, b_str, a, b); \
+        attest_current_failed = 1;
+    }
+}
+
+#define ATTEST_EQUAL(a, b) attest_equal(a, b, #a, #b, __FILE__, __LINE__)
 #endif
 
 #endif //ATTEST_H
