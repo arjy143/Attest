@@ -64,6 +64,70 @@ extern attest_testcase_t *attest_head;
             } \
         } while (0)
 
+int run_all_tests(const char* filter);
+
+#ifdef ATTEST_IMPLEMENTATION
+
+attest_testcase_t* attest_head = NULL;
+
+int run_all_tests(const char* filter)
+{
+    int passed = 0;
+    int failed = 0;
+    for (attest_testcase_t* t = attest_head; t; t = t->next)
+    {
+        if (filter && !strstr(t->name, filter))
+        {
+            continue;     
+        }
+
+        printf("[RUN] %s\n", t->name);
+        fflush(stdout);
+
+        //get another process to run the test
+        int pid = fork();
+        if (pid == 0)
+        {
+            t->func();
+            exit(0);
+        }
+        else
+        {
+            //check if test has passed or not
+            int status;
+            wait(&status);
+            if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
+            {
+                printf("Passed.\n");
+                passed++;
+            }
+            else
+            {
+                printf("Failed.\n";)
+            }
+        }
+    }
+
+    //if at least 1 test fails then the run will return 1, otherwise 0
+    printf("\n=====Summary=====\n%d passed, %d failed\n", passed, failed);
+    return failed > 0 ? 1 : 0;
+}
+
+//default main if one is not provided
+int main(int argc, char** argv)
+{
+    //no filter by default
+    const char* filter = NULL;
+
+    if (argc > 1 && strncmp(argv[1], "--filter=", 9) == 0)
+    {
+        filter = argv[1] + 9;
+    }
+    return run_all_tests(filter);
+}
+
+#endif //ATTEST_IMPLEMENTATION
+
 #ifdef __cplusplus
     }
 #endif
