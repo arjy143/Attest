@@ -105,7 +105,8 @@ int run_all_tests(const char* filter)
             }
             else
             {
-                printf("Failed.\n";)
+                printf("Failed.\n");
+                failed++;
             }
         }
     }
