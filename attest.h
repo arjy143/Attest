@@ -24,7 +24,7 @@ typedef struct attest_testcase
     struct attest_testcase *next;
 } attest_testcase_t;
 
-extern attest_testcase_t *attest_head;
+//extern attest_testcase_t *attest_head;
 
 //macro for registering tests
 #define REGISTER_TEST(name) \
@@ -43,6 +43,7 @@ extern attest_testcase_t *attest_head;
             if (!(condition)) \
             { \
                 fprintf(stderr, "[FAIL] %s:%d: ASSERT_TRUE(%s)\n", __FILE__, __LINE__, #condition); \
+                attest_current_failed = 1; \
                 return; \
             } \
         } while (0)
@@ -52,6 +53,7 @@ extern attest_testcase_t *attest_head;
             if (!((a) == (b))) \
             { \
                 fprintf(stderr, "[FAIL] %s:%d: ASSERT_EQ(%s, %s) - found %lld vs %lld\n", __FILE__, __LINE__, #a, #b, (long long)(a), (long long)(b)); \
+                attest_current_failed = 1; \
                 return; \
             } \
         } while (0)
@@ -61,7 +63,8 @@ extern attest_testcase_t *attest_head;
             if (strcmp((a), (b)) != 0) \
             { \
                 fprintf(stderr, "[FAIL] %s:%d: ASSERT_STR_EQ(%s, %s)\n", __FILE__, __LINE__, #a, #b); \
-                exit(1); \
+                attest_current_failed = 1; \
+                return; \
             } \
         } while (0)
 
@@ -70,8 +73,11 @@ int run_all_tests(const char* filter, int quiet);
 
 #ifdef ATTEST_IMPLEMENTATION
 
-attest_testcase_t* attest_head = NULL;
-//static attest_testcase_t* tests = NULL;
+//below is a data structure to keep track of all tests
+static attest_testcase_t* attest_head = NULL;
+
+//the below variable is used to keep track of if the current test failed
+static int attest_current_failed = 0;
 
 void attest_register(const char* name, attest_func_t func, const char* file, int line)
 {
@@ -105,19 +111,23 @@ int run_all_tests(const char* filter, int quiet)
         int before = failed;
         t->func();
 
-        if (before == failed)
+        if (attest_current_failed == 0)
         {
             if (!quiet)
             {
                 printf("[PASS] %s\n", t->name);
-                passed++;
+                
             }
-            else
-            {
-                printf("[FAIL] %s\n", t->name);
-                failed++;
-            }
+            passed++;
         }
+        else
+        {
+            //not necessary to print FAIL because the macros already do that
+            //printf("[FAIL] %s\n", t->name);
+            failed++;
+            attest_current_failed = 0;
+        }
+        
     }
 
     //if at least 1 test fails then the run will return 1, otherwise 0

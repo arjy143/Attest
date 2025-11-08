@@ -4,7 +4,7 @@
 
 REGISTER_TEST(addition)
 {
-    ATTEST_EQ(2+2, 4);
+    ATTEST_EQ(2+2, 3);
 }
 
 REGISTER_TEST(string)
