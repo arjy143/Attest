@@ -30,6 +30,15 @@ typedef struct attest_testcase
     struct attest_testcase *next;
 } attest_testcase_t;
 
+typedef struct attest_result {
+    const char* name;
+    const char* file;
+    int line;
+    int passed;
+    const char* message; 
+    struct attest_result* next;
+} attest_result_t;
+
 //helper to find float absolute value
 static inline double float_abs(double x)
 {
@@ -174,9 +183,22 @@ int run_all_tests(const char* filter, int quiet);
 
 //below is a data structure to keep track of all tests
 static attest_testcase_t* attest_head = NULL;
-
+//the below linked list is for storing the results which will get output in json at the end
+static attest_result_t* attest_results_head = NULL;
 //the below variable is used to keep track of if the current test failed
 static int attest_current_failed = 0;
+
+static inline void attest_add_result(const char* name, const char* file, int line, int passed, const char* message) 
+{
+    attest_result_t* r = (attest_result_t*)malloc(sizeof(attest_result_t));
+    r->name = name;
+    r->file = file;
+    r->line = line;
+    r->passed = passed;
+    r->message = message;
+    r->next = attest_results_head;
+    attest_results_head = r;
+}
 
 void attest_register(const char* name, attest_func_t func, const char* file, int line)
 {
@@ -218,12 +240,15 @@ int run_all_tests(const char* filter, int quiet)
                 
             }
             passed++;
+            attest_add_result(t->name, t->file, t->line, 1, "Test Passed");
+
         }
         else
         {
             printf("\033[31m%s failed.\033\n", t->name);     
             failed++;
             attest_current_failed = 0;
+            attest_add_result(t->name, t->file, t->line, 0, "Test Failed");
         }
         
     }
@@ -233,6 +258,36 @@ int run_all_tests(const char* filter, int quiet)
     return failed? 1 : 0;
 }
 
+//function to print json
+static void attest_print_json(void) 
+{
+    int total = 0, passed = 0, failed = 0;
+    printf("{\n  \"summary\": {\n");
+
+    // Count
+    for (attest_result_t* r = attest_results_head; r; r = r->next) 
+    {
+        total++;
+        if (r->passed) passed++; else failed++;
+    }
+
+    printf("    \"total\": %d,\n    \"passed\": %d,\n    \"failed\": %d\n  },\n", total, passed, failed);
+    printf("  \"tests\": [\n");
+
+    for (attest_result_t* r = attest_results_head; r; r = r->next) 
+    {
+        printf("    {\n");
+        printf("      \"name\": \"%s\",\n", r->name);
+        printf("      \"file\": \"%s\",\n", r->file);
+        printf("      \"line\": %d,\n", r->line);
+        printf("      \"status\": \"%s\",\n", r->passed ? "pass" : "fail");
+        printf("      \"message\": \"%s\"\n", r->message ? r->message : "");
+        printf("    }%s\n", r->next ? "," : "");
+    }
+
+    printf("  ]\n}\n");
+}
+
 //default main if one is not provided
 int main(int argc, char** argv)
 {
@@ -240,6 +295,7 @@ int main(int argc, char** argv)
     const char* filter = NULL;
     int quiet = 0;
     int list_only = 0;
+    int output_json = 0;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -255,6 +311,10 @@ int main(int argc, char** argv)
         {
             list_only = 1;
         }
+        else if (strncmp(argv[i], "--json", 9) == 0)
+        {
+            output_json = 1;
+        }
     }
     
     if (list_only)
@@ -266,7 +326,13 @@ int main(int argc, char** argv)
         }
         return 0;
     }
-    return run_all_tests(filter, quiet);
+    int res = run_all_tests(filter, quiet);
+
+    if (output_json)
+    {
+        attest_print_json();
+    }
+    return res;
 }
 
 #endif //ATTEST_IMPLEMENTATION

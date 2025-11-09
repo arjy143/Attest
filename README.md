@@ -14,5 +14,5 @@ DONE:
 TO DO:
 
 - maybe add an option to get test results in json format, which could be used to make nice looking dashboards
-- figure out how to print the arguments so that it's easy to see what exactly failed. this is difficult to do if you pass in structs or any other data structure thats not a primitive.
+- timing
 - eventually remove all libc dependencies - make it possible to run on bare metal on any OS. I would need to figure out how to abstract away writing to stdout.
