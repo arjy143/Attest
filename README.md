@@ -13,4 +13,5 @@ DONE:
 
 TO DO:
 - maybe add timing
-- eventually remove all libc dependencies - make it possible to run on bare metal on any OS. I would need to figure out how to abstract away writing to stdout.
+- look into removing malloc usage- could just do everything on stack
+- look into removing string.h because it's easy to implement simple alternatives
