@@ -5,13 +5,14 @@ Lightweight unit testing library for C and C++. I'm making this because I'm too 
 DONE:
 - initial header only implementation
 - basic test stuff compatible with C
-- got it to work with c++ stl containers
+- got it to work with c++ stl containers and other c++ specific data structures
 - CLI arguments like --quiet and --filter, to control what tests are run and the output
 - colours
 - More CLI arguments, e.g. to list registered tests
 
+
 TO DO:
 
-- continue ensuring c++ compatibility
 - maybe add an option to get test results in json format, which could be used to make nice looking dashboards
+- figure out how to print the arguments so that it's easy to see what exactly failed. this is difficult to do if you pass in structs or any other data structure thats not a primitive.
 - eventually remove all libc dependencies - make it possible to run on bare metal on any OS. I would need to figure out how to abstract away writing to stdout.

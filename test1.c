@@ -16,7 +16,6 @@ REGISTER_TEST(addition)
     Point2 s1{1,2};
     Point2 s2{1,2};
     ATTEST_EQUAL(s1, s2);
-    //ATTEST_EQUAL(Point2{1, 2}, Point2{1, 2});
 }
 
 REGISTER_TEST(string)
