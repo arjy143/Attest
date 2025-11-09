@@ -241,6 +241,13 @@ attest_equal_implementation(const T& a, const U& b)
     return memcmp(&a, &b, sizeof(T)) == 0;
 }
 
+template <typename T>
+inline typename std::enable_if<std::is_trivially_copyable<T>::value, bool>::type
+attest_equal_implementation(const T& a, const T& b) 
+{
+    return memcmp(&a, &b, sizeof(T)) == 0;
+}
+
 //for strings
 inline bool attest_equal_implementation(const char* a, const char* b) 
 {

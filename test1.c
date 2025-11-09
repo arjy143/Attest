@@ -5,13 +5,18 @@
 
 struct Point { int x, y; bool operator==(const Point& p) const { return x == p.x && y == p.y; } };
 
+struct Point2{int x; int y;};
+
 REGISTER_TEST(addition)
 {
     ATTEST_EQUAL(2+2, 4);
     ATTEST_EQUAL(5, 5);
     ATTEST_EQUAL(3.14, 3.14);
     ATTEST_EQUAL(true, true);
-    ATTEST_EQUAL(Point{1, 2}, Point{1, 2});
+    Point2 s1{1,2};
+    Point2 s2{1,2};
+    ATTEST_EQUAL(s1, s2);
+    //ATTEST_EQUAL(Point2{1, 2}, Point2{1, 2});
 }
 
 REGISTER_TEST(string)
