@@ -1,14 +1,10 @@
 #ifndef ATTEST_H
 #define ATEST_H
 
-// #ifdef __cplusplus
-// #include <iostream>
-// #include <sstream>
-// #endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 #ifdef __cplusplus
     extern "C" {
@@ -52,6 +48,20 @@ static inline double float_abs(double x)
     }
 }
 
+//below is used for json output
+static int attest_json_mode = 0;
+
+static void attest_printf(const char* text, ...)
+{
+    if (!attest_json_mode)
+    {
+        va_list args;
+        va_start(args, text);
+        vfprintf(stdout, text, args);
+        va_end(args);
+    }
+}
+
 //  C assertion macros
 #define REGISTER_TEST(name) \
         static void name(void); \
@@ -66,7 +76,7 @@ static inline double float_abs(double x)
         { \
             if (!(condition)) \
             { \
-                fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_TRUE(%s)\n", __FILE__, __LINE__, #condition); \
+                attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_TRUE(%s)\n", __FILE__, __LINE__, #condition); \
                 attest_current_failed = 1; \
                 return; \
             } \
@@ -76,7 +86,7 @@ static inline double float_abs(double x)
         { \
             if ((condition)) \
             { \
-                fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_FALSE(%s)\n", __FILE__, __LINE__, #condition); \
+                attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_FALSE(%s)\n", __FILE__, __LINE__, #condition); \
                 attest_current_failed = 1; \
                 return; \
             } \
@@ -109,7 +119,7 @@ static inline double float_abs(double x)
             } \
             if (!is_equal) \
             { \
-                fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_EQUAL(%s, %s)\n", __FILE__, __LINE__, #a, #b); \
+                attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_EQUAL(%s, %s)\n", __FILE__, __LINE__, #a, #b); \
                 attest_current_failed = 1; \
                 return; \
             } \
@@ -142,7 +152,7 @@ static inline double float_abs(double x)
             } \
             if (is_equal) \
             { \
-                fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_NOT_EQUAL(%s, %s)\n", __FILE__, __LINE__, #a, #b); \
+                attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_NOT_EQUAL(%s, %s)\n", __FILE__, __LINE__, #a, #b); \
                 attest_current_failed = 1; \
                 return; \
             } \
@@ -150,7 +160,7 @@ static inline double float_abs(double x)
 
         #define ATTEST_LESS_THAN(a, b) do { \
     if (!((a) < (b))) { \
-        fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_LESS_THAN(%s, %s) failed\n", \
+        attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_LESS_THAN(%s, %s) failed\n", \
                 __FILE__, __LINE__, #a, #b); \
         attest_current_failed = 1; \
         return; \
@@ -159,7 +169,7 @@ static inline double float_abs(double x)
 
 #define ATTEST_GREATER_THAN(a, b) do { \
     if (!((a) > (b))) { \
-        fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_GREATER_THAN(%s, %s) failed\n", \
+        attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_GREATER_THAN(%s, %s) failed\n", \
                 __FILE__, __LINE__, #a, #b); \
         attest_current_failed = 1; \
         return; \
@@ -168,7 +178,7 @@ static inline double float_abs(double x)
 
 #define ATTEST_EQUAL_WITHIN_TOLERANCE(a, b, tolerance) do { \
     if (!(abs_double((double)(a) - (double)(b)) <= (double)(tolerance))) { \
-        fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_EQUAL_WITHIN_TOLERANCE(%s, %s) failed\n", \
+        attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_EQUAL_WITHIN_TOLERANCE(%s, %s) failed\n", \
                 __FILE__, __LINE__, #a, #b); \
         attest_current_failed = 1; \
         return; \
@@ -187,6 +197,7 @@ static attest_testcase_t* attest_head = NULL;
 static attest_result_t* attest_results_head = NULL;
 //the below variable is used to keep track of if the current test failed
 static int attest_current_failed = 0;
+
 
 static inline void attest_add_result(const char* name, const char* file, int line, int passed, const char* message) 
 {
@@ -224,7 +235,7 @@ int run_all_tests(const char* filter, int quiet)
         }
         if (!quiet)
         {
-            printf("\033[33m[RUN] %s\033[0m -> ", t->name);
+            attest_printf("\033[33m[RUN] %s\033[0m -> ", t->name);
         }
 
         fflush(stdout);
@@ -236,7 +247,7 @@ int run_all_tests(const char* filter, int quiet)
         {
             if (!quiet)
             {
-                printf("\033[32m[PASS]\033[0m\n");
+                attest_printf("\033[32m[PASS]\033[0m\n");
                 
             }
             passed++;
@@ -245,7 +256,7 @@ int run_all_tests(const char* filter, int quiet)
         }
         else
         {
-            printf("\033[31m%s failed.\033\n", t->name);     
+            attest_printf("\033[31m%s failed.\033\n", t->name);     
             failed++;
             attest_current_failed = 0;
             attest_add_result(t->name, t->file, t->line, 0, "Test Failed");
@@ -254,7 +265,7 @@ int run_all_tests(const char* filter, int quiet)
     }
 
     //if at least 1 test fails then the run will return 1, otherwise 0
-    printf("\033[34m\n=====Summary=====\033[0m\n\033[32m%d\033[0m passed and \033[31m%d\033[0m failed / \033[34m%d\033[0m total\n", passed, failed, passed+failed);
+    attest_printf("\033[34m\n=====Summary=====\033[0m\n\033[32m%d\033[0m passed and \033[31m%d\033[0m failed / \033[34m%d\033[0m total\n", passed, failed, passed+failed);
     return failed? 1 : 0;
 }
 
@@ -295,7 +306,7 @@ int main(int argc, char** argv)
     const char* filter = NULL;
     int quiet = 0;
     int list_only = 0;
-    int output_json = 0;
+    attest_json_mode = 0;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -313,22 +324,22 @@ int main(int argc, char** argv)
         }
         else if (strncmp(argv[i], "--json", 9) == 0)
         {
-            output_json = 1;
+            attest_json_mode = 1;
         }
     }
     
     if (list_only)
     {
-        printf("List of registered tests:\n");
+        attest_printf("List of registered tests:\n");
         for (attest_testcase_t* t = attest_head; t; t = t->next)
         {
-            printf("%s\n", t->name);
+            attest_printf("%s\n", t->name);
         }
         return 0;
     }
     int res = run_all_tests(filter, quiet);
 
-    if (output_json)
+    if (attest_json_mode)
     {
         attest_print_json();
     }
@@ -408,7 +419,7 @@ inline void attest_equal(const T& a, const U& b,
     
     if (!is_equal)
     {
-        fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_EQUAL(%s, %s) failed\n", file, line, a_str, b_str);
+        attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_EQUAL(%s, %s) failed\n", file, line, a_str, b_str);
         attest_current_failed = 1;
     }
 }
@@ -425,7 +436,7 @@ inline void attest_not_equal(const T& a, const U& b,
     
     if (is_equal)
     {
-        fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_NOT_EQUAL(%s, %s) failed\n", file, line, a_str, b_str);
+        attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_NOT_EQUAL(%s, %s) failed\n", file, line, a_str, b_str);
         attest_current_failed = 1;
     }
 }
