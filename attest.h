@@ -1,10 +1,10 @@
 #ifndef ATTEST_H
 #define ATEST_H
 
-#ifdef __cplusplus
-#include <iostream>
-#include <sstream>
-#endif
+// #ifdef __cplusplus
+// #include <iostream>
+// #include <sstream>
+// #endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,26 +50,6 @@ typedef struct attest_testcase
             } \
         } while (0)
 
-#define ATTEST_INT_EQUAL(a, b) do \
-        { \
-            if (!((a) == (b))) \
-            { \
-                fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_INT_EQUAL(%s, %s) - found %lld vs %lld\n", __FILE__, __LINE__, #a, #b, (long long)(a), (long long)(b)); \
-                attest_current_failed = 1; \
-                return; \
-            } \
-        } while (0)
-
-#define ATTEST_STRING_EQUAL(a, b) do \
-        { \
-            if (strcmp((a), (b)) != 0) \
-            { \
-                fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_STRING_EQUAL(%s, %s)\n", __FILE__, __LINE__, #a, #b); \
-                attest_current_failed = 1; \
-                return; \
-            } \
-        } while (0)
-
 #define ATTEST_NOT_EQUAL(a, b) do \
         { \
             if (((a) == (b))) \
@@ -80,6 +60,38 @@ typedef struct attest_testcase
             } \
         } while (0)
 
+//generic C implementation of equals check
+#define ATTEST_EQUAL(a, b) do \
+        { \
+            int is_equal = 0; \
+            if ((void*)(a) == (void*)(b)) \
+            { \
+                is_equal = 1; \
+            } \
+            else if (sizeof(a) == sizeof(char*) && sizeof(b) == sizeof(char*)) \
+            { \
+                const char* a_string = (const char*)(a); \
+                const char* b_string = (const char*)(b); \
+                if (a_string && b_string && strcmp(a_string, b_string) == 0) \
+                { \
+                    is_equal = 1; \
+                } \
+            } \
+            else if (memcmp(&(a), &(b), sizeof(a)) == 0) \
+            { \
+                is_equal = 1; \
+            } \
+            else if ((a) == (b)) \
+            { \
+                is_equal = 1; \
+            } \
+            if (!is_equal) \
+            { \
+                fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_EQUAL(%s, %s)\n", __FILE__, __LINE__, #a, #b); \
+                attest_current_failed = 1; \
+                return; \
+            } \
+        } while (0)
 
 void attest_register(const char* name, attest_func_t func, const char* file, int line);
 int run_all_tests(const char* filter, int quiet);
@@ -191,16 +203,68 @@ int main(int argc, char** argv)
 
 //  C++ template based assertions
 #ifdef __cplusplus
-template <typename T>
-inline void attest_equal(const T& a, const T& b, const char* a_str, const char* b_str, const char* file, int line)
+
+#include <type_traits>
+
+//helper struct to check if == operator exists
+template <typename T, typename U>
+struct has_equal
 {
-    if (!((a) == (b)))
+    private:
+        template <typename A, typename B>
+        static auto test(int) -> decltype(std::declval<A>() == std::declval<B>(), std::true_type());
+        
+        template <typename, typename>
+        static std::false_type test(...);
+    
+    public:
+        static constexpr bool value = decltype(test<T, U>(0))::value;
+};
+
+//general equality check
+template <typename T, typename U>
+inline typename std::enable_if<has_equal<T,U>::value, bool>::type
+attest_equal_implementation(const T& a, const U& b) 
+{
+    return a == b;
+}
+
+//for mem comparison
+template <typename T, typename U>
+inline typename std::enable_if<!has_equal<T,U>::value && std::is_trivially_copyable<T>::value && std::is_same<T,U>::value, bool>::type
+attest_equal_implementation(const T& a, const U& b) 
+{
+    if (sizeof(T) != sizeof(U)) 
     {
-        fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: C++ ATTEST_EQUAL(%s, %s) - found %lld vs %lld\n", __FILE__, __LINE__, a_str, b_str, a, b); \
+        return false;
+    }
+    return memcmp(&a, &b, sizeof(T)) == 0;
+}
+
+//for strings
+inline bool attest_equal_implementation(const char* a, const char* b) 
+{
+    if (!a || !b) return a == b;
+    return strcmp(a, b) == 0;
+}
+
+//entry point
+template <typename T, typename U>
+inline void attest_equal(const T& a, const U& b,
+                         const char* a_str, const char* b_str,
+                         const char* file, int line)
+{
+    //should automatically deduce the types
+    bool is_equal = false;
+
+    is_equal = attest_equal_implementation(a, b);
+    
+    if (!is_equal)
+    {
+        fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_EQUAL(%s, %s) failed\n", file, line, a_str, b_str);
         attest_current_failed = 1;
     }
 }
-
 #define ATTEST_EQUAL(a, b) attest_equal(a, b, #a, #b, __FILE__, __LINE__)
 #endif
 
