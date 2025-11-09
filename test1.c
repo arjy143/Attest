@@ -27,7 +27,7 @@ REGISTER_TEST(string)
 REGISTER_TEST(vec)
 {
     std::vector<int> a{1,2,3};
-    std::vector<int> b{1,2,3};
+    std::vector<int> b{1,2,34};
     ATTEST_EQUAL(a,b);
 }
 

@@ -31,7 +31,7 @@ typedef struct attest_testcase
 } attest_testcase_t;
 
 //helper to find float absolute value
-static inline float_abs(double x)
+static inline double float_abs(double x)
 {
     if (x < 0)
     {
@@ -139,35 +139,34 @@ static inline float_abs(double x)
             } \
         } while (0)
 
-#define ATTEST_LESS_THAN(a, b) do \
-        { \
-            if (!((a) < (b))) \
-            { \
-                fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_LESS_THAN(%s)\n", __FILE__, __LINE__, #condition); \
-                attest_current_failed = 1; \
-                return; \
-            } \
-        } while (0)
+        #define ATTEST_LESS_THAN(a, b) do { \
+    if (!((a) < (b))) { \
+        fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_LESS_THAN(%s, %s) failed\n", \
+                __FILE__, __LINE__, #a, #b); \
+        attest_current_failed = 1; \
+        return; \
+    } \
+} while(0)
 
-#define ATTEST_GREATER_THAN(a, b) do \
-        { \
-            if (!((a) > (b))) \
-            { \
-                fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_LESS_THAN(%s)\n", __FILE__, __LINE__, #condition); \
-                attest_current_failed = 1; \
-                return; \
-            } \
-        } while (0)
-        
-#define ATTEST_EQUAL_WITHIN_TOLERANCE(a, b, tolerance) do \
-        { \
-            if (!(float_abs((double)(a) - (double)(b)) <= (double)(tolerance))) \
-            { \
-                fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_EQUAL_WITHIN_TOLERANCE(%s)\n", __FILE__, __LINE__, #condition); \
-                attest_current_failed = 1; \
-                return; \
-            } \
-        } while (0)
+#define ATTEST_GREATER_THAN(a, b) do { \
+    if (!((a) > (b))) { \
+        fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_GREATER_THAN(%s, %s) failed\n", \
+                __FILE__, __LINE__, #a, #b); \
+        attest_current_failed = 1; \
+        return; \
+    } \
+} while(0)
+
+#define ATTEST_EQUAL_WITHIN_TOLERANCE(a, b, tolerance) do { \
+    if (!(abs_double((double)(a) - (double)(b)) <= (double)(tolerance))) { \
+        fprintf(stderr, "\033[31m[FAIL]\033[0m %s:%d: ATTEST_EQUAL_WITHIN_TOLERANCE(%s, %s) failed\n", \
+                __FILE__, __LINE__, #a, #b); \
+        attest_current_failed = 1; \
+        return; \
+    } \
+} while(0)
+
+
 void attest_register(const char* name, attest_func_t func, const char* file, int line);
 int run_all_tests(const char* filter, int quiet);
 
