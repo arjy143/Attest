@@ -2,7 +2,6 @@
 #define ATTEST_H
 
 #include <stdio.h>
-#include <string.h>
 #include <stdarg.h>
 
 #ifdef __cplusplus
@@ -39,6 +38,81 @@ static inline double float_abs(double x)
     {
         return x;
     }
+}
+
+//string.h replacement functions, because the original ones sound stupid
+
+//strcmp
+static int compare_strings(const char* a, const char* b)
+{
+    //iterate over the array pointers
+    while (*a && (*a == *b))
+    {
+        a++;
+        b++;
+    }
+    return (unsigned char)*a - (unsigned char)*b;
+}
+
+//strncmp
+static int compare_first_n_chars(const char* a, const char* b, size_t n)
+{
+    while (n-- && *a && (*a == *b))
+    {
+        a++;
+        b++;
+    }
+    
+    if (n == (size_t)-1)
+    {
+        return 0;
+    }
+    else
+    {
+        return (unsigned char)*a - (unsigned char)*b;
+    }
+}
+//strstr - does a contain b, if yes then return pointer to first occurence in a
+static const char* contains(const char* a, const char* b)
+{
+    if (!b)
+    {
+        return a;
+    }
+    for (; *a; a++)
+    {
+        const char* x = a;
+        const char* y = b;
+        while (*x && *y && *x == *y)
+        {
+            x++;
+            y++;
+        }
+
+        if (!*y)
+        {
+            return a;
+        }
+    }
+    return NULL;
+}
+//memcmp
+static int compare_memory(const void* a, const void* b, size_t n)
+{
+    const unsigned char* x = (const unsigned char*)a;
+    const unsigned char* y = (const unsigned char*)b;
+
+    while (n--)
+    {
+        if (*x != *y)
+        {
+            return *x - *y;
+        }
+        x++;
+        y++;
+    }
+    return 0;
+
 }
 
 //below is used for json output
@@ -97,12 +171,12 @@ static void attest_printf(const char* text, ...)
             { \
                 const char* a_string = (const char*)(a); \
                 const char* b_string = (const char*)(b); \
-                if (a_string && b_string && strcmp(a_string, b_string) == 0) \
+                if (a_string && b_string && compare_strings(a_string, b_string) == 0) \
                 { \
                     is_equal = 1; \
                 } \
             } \
-            else if (memcmp(&(a), &(b), sizeof(a)) == 0) \
+            else if (compare_memory(&(a), &(b), sizeof(a)) == 0) \
             { \
                 is_equal = 1; \
             } \
@@ -130,12 +204,12 @@ static void attest_printf(const char* text, ...)
             { \
                 const char* a_string = (const char*)(a); \
                 const char* b_string = (const char*)(b); \
-                if (a_string && b_string && strcmp(a_string, b_string) == 0) \
+                if (a_string && b_string && compare_strings(a_string, b_string) == 0) \
                 { \
                     is_equal = 1; \
                 } \
             } \
-            else if (memcmp(&(a), &(b), sizeof(a)) == 0) \
+            else if (compare_memory(&(a), &(b), sizeof(a)) == 0) \
             { \
                 is_equal = 1; \
             } \
@@ -218,7 +292,7 @@ int run_all_tests(const char* filter, int quiet)
     {
         attest_testcase_t& t = attest_test_list[i];
 
-        if (filter && !strstr(t.name, filter))
+        if (filter && !contains(t.name, filter))
         {
             continue;     
         }
@@ -306,19 +380,19 @@ int main(int argc, char** argv)
 
     for (int i = 1; i < argc; ++i)
     {
-        if (strncmp(argv[i], "--filter=", 9) == 0)
+        if (compare_first_n_chars(argv[i], "--filter=", 9) == 0)
         {
             filter = argv[1] + 9;
         }
-        else if (strncmp(argv[i], "--quiet", 9) == 0)
+        else if (compare_first_n_chars(argv[i], "--quiet", 9) == 0)
         {
             quiet = 1;
         }
-        else if (strncmp(argv[i], "--list", 9) == 0)
+        else if (compare_first_n_chars(argv[i], "--list", 9) == 0)
         {
             list_only = 1;
         }
-        else if (strncmp(argv[i], "--json", 9) == 0)
+        else if (compare_first_n_chars(argv[i], "--json", 9) == 0)
         {
             attest_json_mode = 1;
         }
@@ -387,21 +461,21 @@ attest_equal_implementation(const T& a, const U& b)
     {
         return false;
     }
-    return memcmp(&a, &b, sizeof(T)) == 0;
+    return compare_memory(&a, &b, sizeof(T)) == 0;
 }
 
 template <typename T>
 inline typename std::enable_if<std::is_trivially_copyable<T>::value, bool>::type
 attest_equal_implementation(const T& a, const T& b) 
 {
-    return memcmp(&a, &b, sizeof(T)) == 0;
+    return compare_memory(&a, &b, sizeof(T)) == 0;
 }
 
 //for strings
 inline bool attest_equal_implementation(const char* a, const char* b) 
 {
     if (!a || !b) return a == b;
-    return strcmp(a, b) == 0;
+    return compare_strings(a, b) == 0;
 }
 
 //entry point
@@ -441,9 +515,6 @@ inline void attest_not_equal(const T& a, const U& b,
 
 #define ATTEST_EQUAL(a, b) attest_equal(a, b, #a, #b, __FILE__, __LINE__)
 #define ATTEST_NOT_EQUAL(a, b) attest_not_equal(a, b, #a, #b, __FILE__, __LINE__)
-// #define ATTEST_LESS_THAN(a, b) attest_less_than(a, b, #a, #b, __FILE__, __LINE__)
-// #define ATTEST_GREATER_THAN(a, b) attest_greater_than(a, b, #a, #b, __FILE__, __LINE__)
-// #define ATTEST_EQUAL_WITHIN_TOLERANCE(a, b, tolerance) attest_equal_within_tolerance(a, b, tolerance, #a, #b, __FILE__, __LINE__)
 
 #endif
 
