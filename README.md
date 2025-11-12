@@ -10,8 +10,8 @@ DONE:
 - colours
 - More CLI arguments, e.g. to list registered tests
 - added an option to get test results in json format, which could be used to make nice looking dashboards, and analyse the data easier
+- no malloc anymore, however it is restricted to 1024 tests per run
 
 TO DO:
-- maybe add timing
-- look into removing malloc usage- could just do everything on stack
+
 - look into removing string.h because it's easy to implement simple alternatives
