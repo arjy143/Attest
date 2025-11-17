@@ -129,6 +129,33 @@ static void attest_printf(const char* text, ...)
     }
 }
 
+// C helper macros
+
+#define __ATTEST_IS_ARITHMETIC_TYPE(t) ( \
+    __builtin_types_compatible_p(t, signed char) || \
+    __builtin_types_compatible_p(t, unsigned char) || \
+    __builtin_types_compatible_p(t, short) || \
+    __builtin_types_compatible_p(t, unsigned short) || \
+    __builtin_types_compatible_p(t, int) || \
+    __builtin_types_compatible_p(t, unsigned int) || \
+    __builtin_types_compatible_p(t, long) || \
+    __builtin_types_compatible_p(t, unsigned long) || \
+    __builtin_types_compatible_p(t, long long) || \
+    __builtin_types_compatible_p(t, unsigned long long) || \
+    __builtin_types_compatible_p(t, float) || \
+    __builtin_types_compatible_p(t, double) || \
+    __builtin_types_compatible_p(t, long double) )
+
+#define __ATTEST_IS_CSTRING_TYPE(t) ( \
+    __builtin_types_compatible_p(t, char *) || \
+    __builtin_types_compatible_p(t, const char *) || \
+    __builtin_types_compatible_p(t, char[]) || \
+    __builtin_types_compatible_p(t, const char[]) )
+
+#define __ATTEST_IS_ARITHMETIC_EXPR(e) __ATTEST_IS_ARITHMETIC_TYPE(__typeof__(e))
+#define __ATTEST_IS_CSTRING_EXPR(e) __ATTEST_IS_CSTRING_TYPE(__typeof__(e))
+
+
 //  C assertion macros
 #define REGISTER_TEST(name) \
         static void name(void); \
@@ -160,107 +187,110 @@ static void attest_printf(const char* text, ...)
         } while (0)
 
 //generic C implementation of equals check
-#define ATTEST_EQUAL(x, y) do { \
-            __autotype a = (x); \
-            __autotype b = (y); \
-            int is_equal = 0; \
-            if ((void*)(a) == (void*)(b)) \
-            { \
-                is_equal = 1; \
-            } \
-            else if (sizeof(a) == sizeof(char*) && sizeof(b) == sizeof(char*)) \
-            { \
-                const char* a_string = (const char*)(a); \
-                const char* b_string = (const char*)(b); \
-                if (a_string && b_string && compare_strings(a_string, b_string) == 0) \
-                { \
-                    is_equal = 1; \
-                } \
-            } \
-            else if (compare_memory(&(a), &(b), sizeof(a)) == 0) \
-            { \
-                is_equal = 1; \
-            } \
-            else if ((a) == (b)) \
-            { \
-                is_equal = 1; \
-            } \
-            if (!is_equal) \
-            { \
-                attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_EQUAL(%s, %s)\n", __FILE__, __LINE__, #a, #b); \
-                attest_current_failed = 1; \
-                return; \
-            } \
-        } while (0)
+#define ATTEST_EQUAL(x, y) do \
+{ \
+    __auto_type _a = (x); \
+    __auto_type _b = (y); \
+    int _is_equal = 0; \
+    if (__ATTEST_IS_CSTRING_EXPR(_a) && __ATTEST_IS_CSTRING_EXPR(_b)) \
+    { \
+        const char* _sa = (const char*)_a; \
+        const char* _sb = (const char*)_b; \
+        if (_sa && _sb && compare_strings(_sa, _sb) == 0) _is_equal = 1; \
+        else if (_sa == NULL && _sb == NULL) _is_equal = 1; \
+    } \
+    else \
+    { \
+        if (compare_memory(&_a, &_b, sizeof(_a)) == 0) _is_equal = 1; \
+    } \
+    if (!_is_equal) \
+    { \
+        attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_EQUAL(%s, %s)\n", __FILE__, __LINE__, #x, #y); \
+        attest_current_failed = 1; \
+        return; \
+    } \
+} while (0)
+
 
 //generic C implementation of equals check
 #define ATTEST_NOT_EQUAL(x, y) do \
-        { \
-            __autotype a = (x); \
-            __autotype b = (y); \
-            int is_equal = 0; \
-            if ((void*)(a) == (void*)(b)) \
-            { \
-                is_equal = 1; \
-            } \
-            else if (sizeof(a) == sizeof(char*) && sizeof(b) == sizeof(char*)) \
-            { \
-                const char* a_string = (const char*)(a); \
-                const char* b_string = (const char*)(b); \
-                if (a_string && b_string && compare_strings(a_string, b_string) == 0) \
-                { \
-                    is_equal = 1; \
-                } \
-            } \
-            else if (compare_memory(&(a), &(b), sizeof(a)) == 0) \
-            { \
-                is_equal = 1; \
-            } \
-            else if ((a) == (b)) \
-            { \
-                is_equal = 1; \
-            } \
-            if (is_equal) \
-            { \
-                attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_NOT_EQUAL(%s, %s)\n", __FILE__, __LINE__, #a, #b); \
-                attest_current_failed = 1; \
-                return; \
-            } \
-        } while (0)
-
-        #define ATTEST_LESS_THAN(x, y) do \
-        { \
-    if (!((a) < (b))) { \
-        attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_LESS_THAN(%s, %s) failed\n", \
-                __FILE__, __LINE__, #a, #b); \
+{ \
+    __auto_type _a = (x); \
+    __auto_type _b = (y); \
+    int _is_equal = 0; \
+    if (__ATTEST_IS_CSTRING_EXPR(_a) && __ATTEST_IS_CSTRING_EXPR(_b)) \
+    { \
+        const char* _sa = (const char*)_a; \
+        const char* _sb = (const char*)_b; \
+        if ((_sa && _sb && compare_strings(_sa, _sb) == 0) || (_sa == NULL && _sb == NULL)) _is_equal = 1; \
+    } \
+    else \
+    { \
+        if (compare_memory(&_a, &_b, sizeof(_a)) == 0) _is_equal = 1; \
+    } \
+    if (_is_equal) \
+    { \
+        attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_NOT_EQUAL(%s, %s)\n", __FILE__, __LINE__, #x, #y); \
         attest_current_failed = 1; \
         return; \
     } \
-} while(0)
+} while (0)
+
+#define ATTEST_LESS_THAN(x, y) do \
+{ \
+    __auto_type _a = (x); \
+    __auto_type _b = (y); \
+    if (!(__ATTEST_IS_ARITHMETIC_EXPR(_a) && __ATTEST_IS_ARITHMETIC_EXPR(_b))) \
+    { \
+        attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_LESS_THAN(%s, %s) - non-arithmetic types\n", __FILE__, __LINE__, #x, #y); \
+        attest_current_failed = 1; \
+        return; \
+    } \
+    if (!((_a) < (_b))) \
+    { \
+        attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_LESS_THAN(%s, %s) failed\n", __FILE__, __LINE__, #x, #y); \
+        attest_current_failed = 1; \
+        return; \
+    } \
+} while (0)
 
 #define ATTEST_GREATER_THAN(x, y) do \
+{ \
+    __auto_type _a = (x); \
+    __auto_type _b = (y); \
+    if (!(__ATTEST_IS_ARITHMETIC_EXPR(_a) && __ATTEST_IS_ARITHMETIC_EXPR(_b))) \
     { \
-    __autotype a = (x); \
-    __autotype b = (y); \
-    if (!((a) > (b))) { \
-        attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_GREATER_THAN(%s, %s) failed\n", \
-                __FILE__, __LINE__, #a, #b); \
+        attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_GREATER_THAN(%s, %s) - non-arithmetic types\n", __FILE__, __LINE__, #x, #y); \
         attest_current_failed = 1; \
         return; \
     } \
-} while(0)
+    if (!((_a) > (_b))) \
+    { \
+        attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_GREATER_THAN(%s, %s) failed\n", __FILE__, __LINE__, #x, #y); \
+        attest_current_failed = 1; \
+        return; \
+    } \
+} while (0)
+
 
 #define ATTEST_EQUAL_WITHIN_TOLERANCE(x, y, tolerance) do \
 { \
-    __autotype a = (x); \
-    __autotype b = (y); \
-    if (!(abs_double((double)(a) - (double)(b)) <= (double)(tolerance))) { \
-        attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_EQUAL_WITHIN_TOLERANCE(%s, %s) failed\n", \
-                __FILE__, __LINE__, #a, #b); \
+    __auto_type _a = (x); \
+    __auto_type _b = (y); \
+    if (!(__ATTEST_IS_ARITHMETIC_EXPR(_a) && __ATTEST_IS_ARITHMETIC_EXPR(_b))) \
+    { \
+        attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_EQUAL_WITHIN_TOLERANCE(%s, %s) - non-arithmetic types\n", __FILE__, __LINE__, #x, #y); \
         attest_current_failed = 1; \
         return; \
     } \
-} while(0)
+    if (!(abs_double((double)(_a) - (double)(_b)) <= (double)(tolerance))) \
+    { \
+        attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_EQUAL_WITHIN_TOLERANCE(%s, %s) failed (diff=%f)\n", __FILE__, __LINE__, #x, #y, abs_double((double)(_a) - (double)(_b))); \
+        attest_current_failed = 1; \
+        return; \
+    } \
+} while (0)
+
 
 
 void attest_register(const char* name, attest_func_t func, const char* file, int line);
