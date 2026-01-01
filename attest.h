@@ -159,7 +159,6 @@ static void attest_printf(const char* text, ...)
 //  C assertion macros
 #define REGISTER_TEST(name) \
         static void name(void); \
-        static attest_testcase_t name##_case = {#name, name, NULL}; \
         static void __attribute__((constructor)) register_##name(void) \
         { \
             attest_register(#name, name, __FILE__, __LINE__); \
@@ -186,23 +185,38 @@ static void attest_printf(const char* text, ...)
             } \
         } while (0)
 
+//helper for C string comparison
+static inline int __attest_cstring_equal(const char* a, const char* b)
+{
+    if (a && b) return compare_strings(a, b) == 0;
+    return a == b;
+}
+
+//helper for memory comparison (takes void* to avoid type issues)
+static inline int __attest_mem_equal(const void* a, const void* b, size_t size)
+{
+    return compare_memory(a, b, size) == 0;
+}
+
 //generic C implementation of equals check
+//Note: uses GCC diagnostic pragmas to suppress warnings for branches that won't execute
 #define ATTEST_EQUAL(x, y) do \
 { \
+    _Pragma("GCC diagnostic push") \
+    _Pragma("GCC diagnostic ignored \"-Wint-conversion\"") \
+    _Pragma("GCC diagnostic ignored \"-Wint-to-pointer-cast\"") \
     __auto_type _a = (x); \
     __auto_type _b = (y); \
     int _is_equal = 0; \
     if (__ATTEST_IS_CSTRING_EXPR(_a) && __ATTEST_IS_CSTRING_EXPR(_b)) \
     { \
-        const char* _sa = (const char*)_a; \
-        const char* _sb = (const char*)_b; \
-        if (_sa && _sb && compare_strings(_sa, _sb) == 0) _is_equal = 1; \
-        else if (_sa == NULL && _sb == NULL) _is_equal = 1; \
+        _is_equal = __attest_cstring_equal((const char*)(_a), (const char*)(_b)); \
     } \
     else \
     { \
-        if (compare_memory(&_a, &_b, sizeof(_a)) == 0) _is_equal = 1; \
+        _is_equal = __attest_mem_equal(&_a, &_b, sizeof(_a)); \
     } \
+    _Pragma("GCC diagnostic pop") \
     if (!_is_equal) \
     { \
         attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_EQUAL(%s, %s)\n", __FILE__, __LINE__, #x, #y); \
@@ -224,19 +238,21 @@ static void attest_printf(const char* text, ...)
 //generic C implementation of not equals check
 #define ATTEST_NOT_EQUAL(x, y) do \
 { \
+    _Pragma("GCC diagnostic push") \
+    _Pragma("GCC diagnostic ignored \"-Wint-conversion\"") \
+    _Pragma("GCC diagnostic ignored \"-Wint-to-pointer-cast\"") \
     __auto_type _a = (x); \
     __auto_type _b = (y); \
     int _is_equal = 0; \
     if (__ATTEST_IS_CSTRING_EXPR(_a) && __ATTEST_IS_CSTRING_EXPR(_b)) \
     { \
-        const char* _sa = (const char*)_a; \
-        const char* _sb = (const char*)_b; \
-        if ((_sa && _sb && compare_strings(_sa, _sb) == 0) || (_sa == NULL && _sb == NULL)) _is_equal = 1; \
+        _is_equal = __attest_cstring_equal((const char*)(_a), (const char*)(_b)); \
     } \
     else \
     { \
-        if (compare_memory(&_a, &_b, sizeof(_a)) == 0) _is_equal = 1; \
+        _is_equal = __attest_mem_equal(&_a, &_b, sizeof(_a)); \
     } \
+    _Pragma("GCC diagnostic pop") \
     if (_is_equal) \
     { \
         attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_NOT_EQUAL(%s, %s)\n", __FILE__, __LINE__, #x, #y); \
@@ -352,7 +368,6 @@ int run_all_tests(const char* filter, int quiet)
 
         fflush(stdout);
 
-        int before = failed;
         t->func();
 
         if (attest_current_failed == 0)
@@ -412,7 +427,8 @@ static void attest_print_json(void)
         printf("      \"name\": \"%s\",\n", r->name);
         printf("      \"file\": \"%s\",\n", r->file);
         printf("      \"line\": %d,\n", r->line);
-        printf("      \"status\": \"%s\",\n", r->passed ? "pass" : "fail");
+        printf("      \"status\": \"%s\"\n", r->passed ? "pass" : "fail");
+        printf("    }%s\n", (i < attest_test_index - 1) ? "," : "");
     }
 
     printf("  ]\n}\n");
@@ -431,17 +447,17 @@ int main(int argc, char** argv)
     {
         if (compare_first_n_chars(argv[i], "--filter=", 9) == 0)
         {
-            filter = argv[1] + 9;
+            filter = argv[i] + 9;
         }
-        else if (compare_first_n_chars(argv[i], "--quiet", 9) == 0)
+        else if (compare_first_n_chars(argv[i], "--quiet", 7) == 0)
         {
             quiet = 1;
         }
-        else if (compare_first_n_chars(argv[i], "--list", 9) == 0)
+        else if (compare_first_n_chars(argv[i], "--list", 6) == 0)
         {
             list_only = 1;
         }
-        else if (compare_first_n_chars(argv[i], "--json", 9) == 0)
+        else if (compare_first_n_chars(argv[i], "--json", 6) == 0)
         {
             attest_json_mode = 1;
         }
@@ -527,43 +543,45 @@ inline bool attest_equal_implementation(const char* a, const char* b)
     return compare_strings(a, b) == 0;
 }
 
-//entry point
+//entry point - returns true if check failed (to support early return in macro)
 template <typename T, typename U>
-inline void attest_equal(const T& a, const U& b,
+inline bool attest_equal(const T& a, const U& b,
                          const char* a_str, const char* b_str,
                          const char* file, int line)
 {
     //should automatically deduce the types
-    bool is_equal = false;
+    bool is_equal = attest_equal_implementation(a, b);
 
-    is_equal = attest_equal_implementation(a, b);
-    
     if (!is_equal)
     {
         attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_EQUAL(%s, %s) failed\n", file, line, a_str, b_str);
         attest_current_failed = 1;
+        return true;
     }
+    return false;
 }
 
 template <typename T, typename U>
-inline void attest_not_equal(const T& a, const U& b,
+inline bool attest_not_equal(const T& a, const U& b,
                          const char* a_str, const char* b_str,
                          const char* file, int line)
 {
     //should automatically deduce the types
-    bool is_equal = false;
+    bool is_equal = attest_equal_implementation(a, b);
 
-    is_equal = attest_equal_implementation(a, b);
-    
     if (is_equal)
     {
         attest_printf("\033[31m[FAIL]\033[0m %s:%d: ATTEST_NOT_EQUAL(%s, %s) failed\n", file, line, a_str, b_str);
         attest_current_failed = 1;
+        return true;
     }
+    return false;
 }
 
-#define ATTEST_EQUAL(a, b) attest_equal(a, b, #a, #b, __FILE__, __LINE__)
-#define ATTEST_NOT_EQUAL(a, b) attest_not_equal(a, b, #a, #b, __FILE__, __LINE__)
+#undef ATTEST_EQUAL
+#undef ATTEST_NOT_EQUAL
+#define ATTEST_EQUAL(a, b) do { if (attest_equal(a, b, #a, #b, __FILE__, __LINE__)) return; } while(0)
+#define ATTEST_NOT_EQUAL(a, b) do { if (attest_not_equal(a, b, #a, #b, __FILE__, __LINE__)) return; } while(0)
 
 #endif
 
